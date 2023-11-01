@@ -1,0 +1,39 @@
+# main.kv
+
+<MainScreen>:
+    TabbedPanel:
+        do_default_tab: False
+
+        TabbedPanelItem:
+            text: 'kv_request'
+            KeyValueScreen:
+        
+        TabbedPanelItem:
+            text: 'file_request'
+            FileUploadScreen:
+
+<FileUploadScreen>:
+    orientation: 'vertical'
+
+    MDRaisedButton:
+        text: 'Choose a file'
+        on_release: root.open_file_chooser()
+
+<KeyValueScreen>: # Box Layout
+    orientation: 'vertical'
+
+    TextInput:
+        id: key_input
+        hint_text: 'Enter the key'
+        size_hint_y: None
+        height: '48dp'
+    
+    TextInput:
+        id: value_input
+        hint_text: 'Enter the value'
+        size_hint_y: None
+        height: '48dp'
+
+    MDRaisedButton:
+        text: 'Send a request'
+        on_release: root.send_request()
