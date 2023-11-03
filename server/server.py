@@ -2,11 +2,8 @@ import os
 import asyncio
 from aiohttp import web
 from aiohttp import ClientSession
-from aiohttp import FormData
-from aiohttp import WSMsgType
 import aioconsole
 import asyncpg
-from multiprocessing import Process
 
     
 class input_server:
@@ -14,6 +11,10 @@ class input_server:
         self.host = host
         self.port = port
         self.app = web.Application()
+        
+        self.app['db'] = None
+        self.insert_sql = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
+        self.select_sql = '''SELECT login FROM registered'''
 
         self.app.router.add_post('/login', self.autorization)
         self.app.router.add_post('/send_file', self.send_file)
@@ -21,6 +22,8 @@ class input_server:
         self.app.middlewares.append(self.middleware)
         
         self.bearer_token = "he45stogddf8g70sd7g0g7sd07gs05"
+        
+        
         
         self.url_controller = ""
         
@@ -38,12 +41,17 @@ class input_server:
         return response
             
     async def start_server(self):
+        await self.app['db'].fetch(self.insert_sql, "admin", "password")
+        otvet = await self.app['db'].fetch(self.insert_sql, "admin", "password")
+        print(otvet)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, self.host, self.port)
         await self.site.start()
         
         await aioconsole.aprint(f"сервер запущен c портом {self.port}")
+        
+        
 
     async def autorization(self, request: web.Request)->web.Response:
         
@@ -132,6 +140,21 @@ class input_server:
 
 async def main():
     my_input_servers = input_server('localhost', 8888)
+    credentials = {
+        "user": "admin",
+        "password": "root",
+        "database": "postgres",
+        "host": "127.0.0.1",
+    }
+    
+    pool = await asyncpg.create_pool(**credentials)
+        
+    if pool._closed:
+        print("Connection failed")
+    else:
+        print("Connection successful")
+    pool.acquire()
+    my_input_servers.app['db'] = pool
     tasks = [
         asyncio.create_task(my_input_servers.start_server())
     ]
