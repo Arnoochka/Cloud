@@ -11,6 +11,8 @@ class client:
         self.port = 8888
         self.url = 'http://localhost:8888'
         
+        self.token= ''
+        
         
     async def start_client(self):
         if await self.autorization():
@@ -23,10 +25,10 @@ class client:
              
     async def autorization(self)->bool:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.url}/login" , data = {'login': self.login, 'password':self.password}) as response:
-                code = await response.text()
-                
-                return int(code) == 200
+            async with session.post(f"{self.url}/login" , json = {'login': self.login, 'password':self.password}) as response:
+                 self.token = await response.text()
+                 return response.status == 200
+                 
 
     async def send_command(self, command):
         async with aiohttp.ClientSession() as session:
@@ -39,16 +41,15 @@ class client:
                     print("ошибка")
 
     async def send_file(self):
-        with open('Cloud/server/image.jpg', 'rb') as file:
-            data = {'file':file.read(), 'name': 'file_name.jpg'}
-            print(data)
+        with open('image.jpg', 'rb') as file:
+            data = {'file':file.read(), 'filename': 'file_name.jpg', 'token': self.token}
         async with aiohttp.ClientSession() as session:
             async with session.post(f"{self.url}/send_file", data = data) as response:
-                code = int(await response.text())
-                if code == 200:
+                answer = await response.text()
+                if answer == 200:
                     print("файл успешно отправлен")
                 else:
-                    print("ошибка")
+                    print(response.status, answer)
 
 
 if __name__=="__main__":    

@@ -4,46 +4,53 @@ from aiohttp import web
 from aiohttp import ClientSession
 import aioconsole
 import asyncpg
-
+import json
+    
+async def is_valid(user_token):
+    return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
     
 class input_server:
     def __init__(self, host, port):
         self.host = host
+        
         self.port = port
-        self.app = web.Application()
+        self.app = web.Application(middlewares=[self.mid])
         
         self.app['db'] = None
         self.insert_sql = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
-        self.select_sql = '''SELECT login FROM registered'''
+        self.select_sql = '''SELECT * FROM registered WHERE login=$1'''
 
         self.app.router.add_post('/login', self.autorization)
         self.app.router.add_post('/send_file', self.send_file)
-        self.app.router.add_get("/name_files", self.send_file)
-        self.app.middlewares.append(self.middleware)
+        self.app.router.add_get("/name_files", self.get_file_name)
+        self.app.router.add_post("/get_file", self.get_files)
         
         self.bearer_token = "he45stogddf8g70sd7g0g7sd07gs05"
         
-        
-        
         self.url_controller = ""
-        
-    async def middleware(self, app, heandler: callable, request: web.Request)->web.Response:
-        if request.path == "/login":
-            response = await heandler(request)
-        elif request.headers.get("Autorization"):
-            if self.bearer_token == request["Autorization"]:
-                response = await heandler(request)
-            else:
-                return web.Response(status=401, body="you not autorization")
-        else:
-            return web.Response(status=401, body="you not autorization")
-        
-        return response
+    
+    async def mid(self, app, handler):
+        async def middleware(request) -> web.Response:
             
+            if request.path == "/login":
+                responce = await handler(request)
+                return responce
+            else:
+                data = await request.post()
+                
+            if 'token' in data.keys():
+                if await is_valid(data['token']):
+                    responce = await handler(request)
+                else:
+                    return web.Response(status=401, body="you are not authorized")
+            else:
+                return web.Response(status=401, body="you are not authorized")
+            
+            return responce
+        
+        return middleware 
+    
     async def start_server(self):
-        await self.app['db'].fetch(self.insert_sql, "admin", "password")
-        otvet = await self.app['db'].fetch(self.insert_sql, "admin", "password")
-        print(otvet)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()
         self.site = web.TCPSite(self.runner, self.host, self.port)
@@ -54,25 +61,31 @@ class input_server:
         
 
     async def autorization(self, request: web.Request)->web.Response:
+        data = await request.json()
         
-        if not request.headers.get('login') or not request.headers.get('password'):
-            return web.Response(status=400, body="no login or password entered")
+        not_atribute = await self.checking_for_attributes(["login", "password"], data.keys())
+        if not_atribute[0]:
+            return web.Response(status=401, body=f"not received {not_atribute[1]}")
         
-        data = await request.post()
+        await self.app['db'].fetch(self.insert_sql, "admin", "password")
+        person = await self.app['db'].fetch(self.select_sql, data["login"])
         
-        
-        
-        print(data['login'], data['password'])
-        
-        return web.Response(status=200, body="autorization successfully")
+        if len(person) == 0:
+            await self.app['db'].fetch(self.insert_sql, data["login"], data["password"])
+            return web.Response(status=201, body=self.bearer_token)
+        elif person[0]["password"] == data["password"]:
+            return web.Response(status=200, body= self.bearer_token)
+        else:
+            return web.Response(status=401, body= "invalid login or password")
+
     
     async def send_file(self, request: web.Request)->web.Response:
         
-        not_atribute = await self.checking_for_attributes(['login', 'file', 'filename'], request)
+        data = await request.post()
+        
+        not_atribute = await self.checking_for_attributes(['token', 'file', 'filename'], data.keys())
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
-            
-        data = await request.post()
 
         # отправка данных контроллеру
         
@@ -82,11 +95,11 @@ class input_server:
             
     async def get_file_name(self, request: web.Request):
         
-        not_atribute = await self.checking_for_attributes(['login', 'files'], request)
+        data = await request.post()
+        
+        not_atribute = await self.checking_for_attributes(['token', 'files'], data.keys())
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
-        
-        data = await request.get()
         
         #получение имен файлов от сервера
         async with ClientSession() as session:
@@ -120,19 +133,22 @@ class input_server:
     #         for filename in filenames:
     #             with open(filename, 'rb') as file:
     #                 await ws.send_bytes(file.read())  # отправка содержимого каждого файла обратно клиенту
+    
     async def get_files(self, request: web.Request):
         
-        not_atribute = await self.checking_for_attributes(['login', 'files'], request)
+        data = await request.json()
+        
+        not_atribute = await self.checking_for_attributes(['token', 'files'], data.keys())
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
         async with ClientSession() as session:
-            async with session.post(f"{self.url_controller}/get_file_name", data = request['data']) as response:
+            async with session.post(f"{self.url_controller}/get_file", data = request['data']) as response:
                 return await response
         
             
-    async def checking_for_attributes(self, atrubutes: list, request: web.Request)->tuple:
-        for atribute in list:
-            if not request.headers.get(atribute):
+    async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
+        for atribute in atributes:
+            if not atribute in data_atribute:
                 return (1, atribute)
         return (0, "not")
 
