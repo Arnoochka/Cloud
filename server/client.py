@@ -8,8 +8,8 @@ class client:
         self.login = "admin"
         self.password = "password"
         self.host = "127.0.0.1"
-        self.port = 8888
-        self.url = 'http://localhost:8888'
+        self.port = 8080
+        self.url = 'http://localhost:8080'
         
         self.token= ''
         
@@ -27,6 +27,8 @@ class client:
         async with aiohttp.ClientSession() as session:
             async with session.post(f"{self.url}/login" , json = {'login': self.login, 'password':self.password}) as response:
                  self.token = await response.text()
+            async with session.post(f"{self.url}/login" , json = {'login': self.login, 'password':self.password}) as response:
+                 self.token = await response.text()
                  return response.status == 200
                  
 
@@ -35,6 +37,7 @@ class client:
             data = {"command": command}
             async with session.post(f"{self.url}/send_file", json = data) as response:
                 code = await response.text()
+                
                 if int(code) == 200:
                     print("команда успешно отправлена")
                 else:
@@ -49,7 +52,7 @@ class client:
                 if answer == 200:
                     print("файл успешно отправлен")
                 else:
-                    print(response.status, answer)
+                    print(response.content, answer)
 
 
 if __name__=="__main__":    
