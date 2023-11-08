@@ -14,7 +14,6 @@ async def client(number):
 
     t = time.time()
     response = requests.post('http://localhost:8080/login', json=data)
-    response.content
     
     data = {
             'login': f"admin_{number}",

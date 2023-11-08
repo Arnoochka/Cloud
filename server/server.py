@@ -1,16 +1,16 @@
 import os
 import asyncio
 from aiohttp import web
-from aiohttp import ClientSession
 import aioconsole
 import asyncpg
-from multiprocessing import Process
-    
+import multiprocessing as mp
+
 async def is_valid(user_token):
     return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
     
+    
 class input_server:
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int):
         self.host = host
         
         self.port = port
@@ -70,7 +70,6 @@ class input_server:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
         
         person = await self.app['db'].fetch(self.select_sql, data["login"])
-        print(data['login'])
         if len(person) == 0:
             await self.app['db'].fetch(self.insert_sql, data["login"], data["password"])
             return web.Response(status=201, body=self.bearer_token)
@@ -91,10 +90,6 @@ class input_server:
         return web.Response(status=200, body="http://localhost:8888/send_file")
 
         # отправка данных контроллеру
-        
-        async with ClientSession() as session:
-            async with session.post(f"{self.url_controller}/send_file", data = data) as response:
-                return await response
             
     async def get_file_name(self, request: web.Request):
         
@@ -102,20 +97,11 @@ class input_server:
         
         return web.Response(status=200, body="http://localhost:8888/get_file_name")
         
-        #получение имен файлов от сервера
-        async with ClientSession() as session:
-            async with session.get(f"{self.url_controller}/get_file_name", params = data) as response:
-                return await response
-    
     async def get_file(self, request: web.Request):
         
         data = await request.post()
         
         return web.Response(status=200, body="http://localhost:8888/get_files")
-        
-        async with ClientSession() as session:
-            async with session.get(f"{self.url_controller}/get_file", data = request['data']) as response:
-                return await response
         
             
     async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
@@ -125,22 +111,26 @@ class input_server:
         return (0, "not")
               
 class transport_server:
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int, MAX_PROCESS: int, MAX_SIZE_Q):
         
         self.host = host
         self.port = port
         self.app = web.Application()
-        
-        self.app['db'] = None
-        self.insert_sql = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
-        self.select_sql = '''SELECT * FROM registered WHERE login=$1'''
     
         self.app.router.add_post('/send_file', self.send_file)
         self.app.router.add_post("/name_files", self.get_file_name)
         self.app.router.add_post("/get_file", self.get_file) 
         
         self.bearer_token = "he45stogddf8g70sd7g0g7sd07gs05"
-        self.number_directory = 0
+        self.number_process = 0
+        
+        self.using_send_queue = mp.Queue()
+        self.MAX_SIZE_Q = MAX_SIZE_Q
+        
+        self.job_process = [mp.Process(target=write_file, args=(self.using_send_queue, i)) for i in range(MAX_PROCESS)]
+        
+        for i in range(MAX_PROCESS):
+            self.job_process[i].start()
         
     async def mid(self, app, handler):
         async def middleware(request: web.Request) -> web.Response:
@@ -171,28 +161,14 @@ class transport_server:
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
         
-        chunk_file = data['file_chunk'].file.read()
+        chunk = data["file_chunk"].file.read()
         
-        if chunk_file == 'start'.encode():
-            if not os.path.isdir(f"files/{data['login']}"):
-                os.mkdir(f"files/{data['login']}")
-                
-            file = open(f"files/{data['login']}/{data['file_name']}", "+wb")
-            file.close()
-            return web.Response(status=200, body="start writing")
         
-        if chunk_file == 'end'.encode:
-            os.rename(f"files/{data['login']}/{data['file_name']}.bin", f"files/{data['login']}/{data['file_name']}.{data['file_name']}")
-            return web.Response(status=200, body="file has written")
+        self.using_send_queue.put({"login": data["login"], "file_chunk": chunk, "file_name": data["file_name"]})
         
-        with open(f"files/{data['login']}/{data['file_name']}", "+ba") as file:
-            file.write(chunk_file)
-            return web.Response(status=200, body="chuck saved")
+        return web.Response(status= 200, body="OK")
     
-    async def get_file_name():
-        pass
-    
-    async def get_file():
+    async def get_file(self, request: web.Request):
         pass
     
     async def checking_for_attributes(self, atributes: list, data_atribute: set)->tuple:
@@ -201,10 +177,34 @@ class transport_server:
                 return (1, atribute)
         return (0, "not")
     
+    def copy(self, queue: mp.Queue):
+        copy_Queue = mp.Queue()
+        while not queue.empty():
+            data = queue.get()
+
+            copy_Queue.put(data)
+        return copy_Queue
     
-async def main():
+def write_file(queue: mp.Queue, number: int):
+    while True:
+        if not queue.empty():
+            data = queue.get()
+            chunk_file = data['file_chunk']
+            if chunk_file == 'start'.encode():
+                if not os.path.isdir(f"files/{data['login']}"):
+                    os.mkdir(f"files/{data['login']}")
+                file = open(f"files/{data['login']}/{data['file_name']}", "w")
+                file.close()
+                continue
+            
+            if chunk_file == 'end'.encode():
+                continue
+            with open(f"files/{data['login']}/{data['file_name']}", "+ba") as file:
+                file.write(chunk_file)
+    
+async def main():            
     my_input_servers = input_server('localhost', 8080)
-    my_transpot_servers = transport_server('localhost', 8888)
+    my_transpot_servers = transport_server('localhost', 8888, 10, 100)
     credentials = {
         "user": "admin",
         "password": "root",
@@ -218,6 +218,7 @@ async def main():
         print("Connection failed")
     else:
         print("Connection to databes successfuly")
+        
     pool.acquire()
     my_input_servers.app['db'] = pool
     tasks = [
