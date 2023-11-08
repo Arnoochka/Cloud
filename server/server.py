@@ -4,6 +4,7 @@ from aiohttp import web
 import aioconsole
 import asyncpg
 import multiprocessing as mp
+import time
 
 async def is_valid(user_token):
     return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
@@ -59,8 +60,6 @@ class input_server:
         await self.site.start()
         
         await aioconsole.aprint(f"сервер input_server c портом {self.port}")
-        
-        
 
     async def autorization(self, request: web.Request)->web.Response:
         data = await request.json()
@@ -82,26 +81,28 @@ class input_server:
     async def send_file(self, request: web.Request)->web.Response:
         
         data = await request.post()
+         # логика
+        #...
         
         not_atribute = await self.checking_for_attributes(['token', 'file', 'filename'], data.keys())
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
         
-        return web.Response(status=200, body="http://localhost:8888/send_file")
+        return web.Response(status=200, body="URL транспортного сервера")
 
-        # отправка данных контроллеру
             
     async def get_file_name(self, request: web.Request):
         
         data = await request.post()
         
-        return web.Response(status=200, body="http://localhost:8888/get_file_name")
+        return web.Response(status=200, body="")
         
     async def get_file(self, request: web.Request):
         
         data = await request.post()
-        
-        return web.Response(status=200, body="http://localhost:8888/get_files")
+        # логика
+        #...
+        return web.Response(status=200, body="URL транспортного сервера")
         
             
     async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
@@ -118,7 +119,6 @@ class transport_server:
         self.app = web.Application()
     
         self.app.router.add_post('/send_file', self.send_file)
-        self.app.router.add_post("/name_files", self.get_file_name)
         self.app.router.add_post("/get_file", self.get_file) 
         
         self.bearer_token = "he45stogddf8g70sd7g0g7sd07gs05"
@@ -126,11 +126,10 @@ class transport_server:
         
         self.using_send_queue = mp.Queue()
         self.MAX_SIZE_Q = MAX_SIZE_Q
+        self.send_task_done = mp.Queue()
         
-        self.job_process = [mp.Process(target=write_file, args=(self.using_send_queue, i)) for i in range(MAX_PROCESS)]
-        
-        for i in range(MAX_PROCESS):
-            self.job_process[i].start()
+        self.job_process = [mp.Process(target=demon_write_file, args=(self.using_send_queue, self.send_task_done)) for i in range(MAX_PROCESS)]
+        self.process_task_done = mp.Process(target=demon_send_done_task, args=(self.send_task_done, ))
         
     async def mid(self, app, handler):
         async def middleware(request: web.Request) -> web.Response:
@@ -153,6 +152,14 @@ class transport_server:
         
         await aioconsole.aprint(f"сервер transport_server c портом {self.port}")
         
+        for i in range(len(self.job_process)):
+            self.job_process[i].daemon = True
+            self.job_process[i].start()
+            
+        self.process_task_done.daemon = True
+        self.process_task_done.start()
+        
+        
     async def send_file(self, request: web.Request):
         
         data = await request.post()
@@ -163,8 +170,9 @@ class transport_server:
         
         chunk = data["file_chunk"].file.read()
         
-        
         self.using_send_queue.put({"login": data["login"], "file_chunk": chunk, "file_name": data["file_name"]})
+        
+        
         
         return web.Response(status= 200, body="OK")
     
@@ -185,7 +193,7 @@ class transport_server:
             copy_Queue.put(data)
         return copy_Queue
     
-def write_file(queue: mp.Queue, number: int):
+def demon_write_file(queue: mp.Queue, queue_done: mp.Queue):
     while True:
         if not queue.empty():
             data = queue.get()
@@ -198,13 +206,21 @@ def write_file(queue: mp.Queue, number: int):
                 continue
             
             if chunk_file == 'end'.encode():
-                continue
+                queue_done.put((data['login'], data['file_name']))    
+            
+            
             with open(f"files/{data['login']}/{data['file_name']}", "+ba") as file:
                 file.write(chunk_file)
+
+def demon_send_done_task(queue: mp.Queue):
+    while True:
+        if not queue.empty():
+            print(queue.get()) #отправка, что можно забирать
+        time.sleep(1)
     
-async def main():            
+async def main():           
     my_input_servers = input_server('localhost', 8080)
-    my_transpot_servers = transport_server('localhost', 8888, 10, 100)
+    my_transpot_servers = transport_server('localhost', 8888, 10, 50)
     credentials = {
         "user": "admin",
         "password": "root",
