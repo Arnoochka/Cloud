@@ -5,10 +5,7 @@ import aioconsole
 import asyncpg
 import multiprocessing as mp
 import time
-
-async def is_valid(user_token):
-    return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
-    
+import aioconsole
     
 class input_server:
     def __init__(self, host: str, port: int):
@@ -20,10 +17,11 @@ class input_server:
         self.app['db'] = None
         self.insert_sql = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
         self.select_sql = '''SELECT * FROM registered WHERE login=$1'''
+        self.search_files_sql = '''SELECT nameFile FROM userFile WHERE login=$1'''
 
         self.app.router.add_post('/login', self.autorization)
         self.app.router.add_post('/send_file', self.send_file)
-        self.app.router.add_post("/name_files", self.get_file_name)
+        self.app.router.add_get("/name_files", self.get_file_name)
         self.app.router.add_post("/get_file", self.get_file)
         
         self.transport_server = []
@@ -33,6 +31,8 @@ class input_server:
         self.url_controller = ""
     
     async def mid(self, app, handler):
+        '''
+        '''
         async def middleware(request) -> web.Response:
             
             if request.path == "/login":
@@ -93,9 +93,11 @@ class input_server:
             
     async def get_file_name(self, request: web.Request):
         
-        data = await request.post()
+        login = await request.query.get('login')
         
-        return web.Response(status=200, body="")
+        person = await self.app['db'].fetch(self.search_files_sql, login)
+        
+        return web.json_response(person)
         
     async def get_file(self, request: web.Request):
         
@@ -174,8 +176,6 @@ class transport_server:
         
         self.using_send_queue.put({"login": data["login"], "file_chunk": chunk, "file_name": data["file_name"]})
         
-        
-        
         return web.Response(status= 200, body="OK")
     
     async def get_file(self, request: web.Request):
@@ -219,10 +219,22 @@ def demon_send_done_task(queue: mp.Queue):
         if not queue.empty():
             print(queue.get()) #отправка, что можно забирать
         time.sleep(1)
+        
+async def is_valid(user_token):
+    return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
     
 async def main():           
     my_input_servers = input_server('localhost', 8080)
-    my_transpot_servers = transport_server('localhost', 8888, 10, 50)
+    
+    
+    my_transpot_servers = list()
+    
+    number_transport_servers = 3
+    number_process_demon = 5
+    
+    for i in range(number_transport_servers):
+        my_transpot_servers.append(transport_server('localhost', 8000 + i, number_process_demon, 50))
+    
     credentials = {
         "user": "admin",
         "password": "root",
