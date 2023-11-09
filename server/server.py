@@ -157,8 +157,6 @@ class transport_server:
         for i in range(len(self.job_process)):
             self.job_process[i].daemon = True
             self.job_process[i].start()
-
-        g
             
         self.process_task_done.daemon = True
         self.process_task_done.start()
