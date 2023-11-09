@@ -10,7 +10,7 @@ from base64 import b64encode as enc64
 
 async def client(number):
     data = {'login': f'admin_{str(number)}',
-            'password': 'inside-your-dad'}
+            'password': 'inside-your-dad'} # ha-ha
 
     t = time.time()
     response = requests.post('http://localhost:8080/login', json=data)
