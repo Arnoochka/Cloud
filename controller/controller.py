@@ -1,82 +1,71 @@
-import socket
+from flask import Flask
+from flask import request
+from flask import abort
 import os
-import tqdm
-import sys
+import multiprocessing as mp
 
-from constants import *
-from replication import Replication
+app = Flask(__name__)
 
-class Controller:
+def upload_file(dir: str, filename: str, chunk: bytes, end: str) -> int:
+    filepath = f'/Users/maus/Documents/GitHub/Cloud/data/{dir}'
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+
+    if os.path.exists(f'/Users/maus/Documents/GitHub/Cloud/data/{dir}/[END]{filename}'):
+        return -1
+
+    with open(f'{filepath}/{filename}', '+ba') as f:
+        f.write(chunk)
+
+    if end == 'true':
+        os.rename(f'{filepath}/{filename}', 
+                  f'/Users/maus/Documents/GitHub/Cloud/data/{dir}/[END]{filename}')
+        return 0
+    
+
+    return 1
+
+
+@app.route('/upload_to_ctrller', methods=['POST'])
+def handleFile():
+    if request.method == 'POST':
+        if UploadData.is_valid_data(request.files) \
+            and LoginData.is_valid_data(request.files):
+
+            if upload_file(request.files['login'].stream.read().decode(),
+                        request.files['filename'].stream.read().decode(),
+                        request.files['file_chunk'].stream.read(),
+                        request.files['end'].stream.read().decode()) == -1:
+                return abort(400)
+            
+
+            return 'Hello, World!'
+        else:
+            print('WRONG', request.files)
+            return 'WRONG PARAMETERS'
+    else:
+        return 'ITS FILE CTRLLER ROUTE! NO GET '
+    
+class LoginData:
     def __init__(self) -> None:
         pass
 
     @staticmethod
-    def loop() -> None:
-        try:
-            # TCP SOCKET
-            s = socket.socket()
-            h = socket.socket()
-            print('SOCKET[IPV4, TCP] created')
-        except socket.error as err:
-            print('SOCKET[IPV4, TCP] creation error: ', err)
-
-        s.bind((CTRLLER_HOST, CTRLLER_PORT))
-
-        print(f'[*] LISTENING as {CTRLLER_HOST}:{CTRLLER_PORT}')
-        h.connect((DATA_HOST, 10001))
-        while True:
-            s.listen(1)
-            client_socket, address = s.accept()
-            print(f'[+] {address} is conntected')
-
-            received = client_socket.recv(BUFFER_SIZE).decode()
-            username, filename, filesize = received.split(SEPARATOR)
-            # remove absolute path if there is
-            filename = os.path.basename(filename)
-            filesize = int(filesize)
-
-            
-            h.sendall(f'{username}{SEPARATOR}{filename}{SEPARATOR}{filesize}'.encode())
-            progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-            while True:
-                bytes_read = client_socket.recv(BUFFER_SIZE)
-                if not bytes_read:
-                    # nothing is received
-                    print(f'[!] Got zero data from {address}')
-                    progress.update(len(bytes_read))
-                    break
+    def is_valid_data(data: dict) -> bool:
+        return \
+        'login' in data.keys() \
+        and 'token' in data.keys()
                 
-                h.sendall(bytes_read)
-                progress.update(len(bytes_read))
-            
-            
-            continue
 
-            db_userfolder = DATA_FOLDER + username
-            if not os.path.exists(db_userfolder):
-                os.makedirs(db_userfolder)
+class UploadData:
+    def __init__(self) -> None:
+        pass
 
-            '''
-            start receiving the file from the socket
-            and writing to the file stream
-            '''
-            progress = tqdm.tqdm(range(filesize), 
-                                f'Receiving {filename}',
-                                unit='B', unit_scale=True,
-                                unit_divisor=1024)
-            with open(db_userfolder + '/' + filename, 'wb') as f:
-                while True:
-                    # read BUFFER_SIZE[default=4096] bytes from the socket
-                    bytes_read = client_socket.recv(BUFFER_SIZE)
-                    if not bytes_read:
-                        # nothing is received
-                        print(f'[!] Got zero data from {address}')
-                        break
-                    # write to the file the bytes we just received
-                    f.write(bytes_read)
-                    # update the progress bar
-                    progress.update(len(bytes_read))
-
-
-if __name__ == "__main__":
-    Controller.loop()
+    @staticmethod
+    def is_valid_data(file: dict) -> bool:
+        return 'file_chunk' in file.keys() \
+        and 'filename' in file.keys() \
+        and 'end' in file.keys()
+    
+if __name__ == '__main__':
+    app.run(host='172.20.10.2', port=10000)
