@@ -27,21 +27,24 @@ class MainScreen(BoxLayout):
 login = ""
 password = ""
 token = ""
+ip = "192.168.154.5"
+
 
 class AuthorizationScreen(BoxLayout):
     def send_request(self):
         global login
         global password
         global token
+        global ip
 
         login = self.ids.login_input.text
         password = self.ids.password_input.text
 
         data = {'login': login, 'password': password}
-        response = requests.post('http://localhost:8080/login', json=data)
+        response = requests.post(f'http://{ip}:8080/login', json=data)
         token = response.content.decode()
 
-        print(response.status)
+        print(response.content.decode())
 
 class FileUploadScreen(BoxLayout):
     def open_file_chooser(self):
@@ -76,20 +79,34 @@ class FileUploadScreen(BoxLayout):
                 new_file.append(f)
 
             data = {
-                'login': login,
+                'login': login.encode(),
                 'file_chunk': [],
-                'file_name': file_path,
-                'token': token
+                'filename': file_path.encode(),
+                'token': token.encode()
             }
-            asyncio.run(self.upload_chunks(new_file, data))
 
-    async def upload_chunks(self, new_file, data):
+            response = requests.post(f"http://{ip}:8080/send_file", data=data)            
+            print(response.content.decode())
+            url = response.content.decode()
+
+            asyncio.run(self.upload_chunks(new_file, data, url))
+
+    async def upload_chunks(self, new_file, data, url):
+        """
         async with aiohttp.ClientSession() as session:
             for chunk in new_file:
                 data['file_chunk'] = chunk
-                response = await session.post("http://localhost:8888/send_file", data=data)
-                print(response.status)
 
+                print(f"http://{url}/send_file")
+
+                response = await session.post(f"http://{url}/send_file", data=data)
+                #files={"file_chunk": chunk}
+                print(response.status)
+        
+        """
+        for chunk in new_file:
+            response = requests.post(f"http://{url}/send_file", data=data, files={"file_chunk": chunk})
+            print(response.content)
 
 if __name__ == '__main__':
     KeyValueApp().run()
