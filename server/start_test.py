@@ -33,7 +33,7 @@ def client(number):
         'token': response.content.decode()
     }        
     for chunk in new_file:
-        response = requests.post('http://localhost:8000/send_file', files={"file_chunk": chunk}, data=data)
+        response = requests.post('http://localhost:8888/send_file', files={"file_chunk": chunk}, data=data)
     print(time.time() - t)
 
 
