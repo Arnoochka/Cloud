@@ -1,39 +1,41 @@
-# main.kv
+#:kivy 2.2.0
 
 <MainScreen>:
     TabbedPanel:
         do_default_tab: False
 
         TabbedPanelItem:
-            text: 'kv_request'
-            KeyValueScreen:
+            text: 'authorization'
+            AuthorizationScreen:
         
         TabbedPanelItem:
-            text: 'file_request'
+            text: 'file_sending'
             FileUploadScreen:
 
 <FileUploadScreen>:
     orientation: 'vertical'
 
+    #on_enter: root.show_auth_message()
+
     MDRaisedButton:
         text: 'Choose a file'
         on_release: root.open_file_chooser()
 
-<KeyValueScreen>: # Box Layout
+<AuthorizationScreen>: 
     orientation: 'vertical'
 
     TextInput:
-        id: key_input
-        hint_text: 'Enter the key'
+        id: login_input
+        hint_text: 'Login'
         size_hint_y: None
         height: '48dp'
     
     TextInput:
-        id: value_input
-        hint_text: 'Enter the value'
+        id: password_input
+        hint_text: 'Password'
         size_hint_y: None
         height: '48dp'
 
     MDRaisedButton:
-        text: 'Send a request'
+        text: 'Log in'
         on_release: root.send_request()
