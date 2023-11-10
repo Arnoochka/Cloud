@@ -1,11 +1,14 @@
 import os
 import asyncio
-from aiohttp import web
+from aiohttp import web, ClientSession
 import aioconsole
 import asyncpg
 import multiprocessing as mp
 import time
 import aioconsole
+import io
+
+host = 'localhost'
     
 class input_server:
     def __init__(self, host: str, port: int):
@@ -24,7 +27,7 @@ class input_server:
         self.app.router.add_get("/name_files", self.get_file_name)
         self.app.router.add_post("/get_file", self.get_file)
         
-        self.transport_server = []
+        self.transport_servers_URL = []
         
         self.bearer_token = "he45stogddf8g70sd7g0g7sd07gs05"
         
@@ -185,13 +188,11 @@ class transport_server:
                 return (1, atribute)
         return (0, "not")
     
-    def copy(self, queue: mp.Queue):
-        copy_Queue = mp.Queue()
-        while not queue.empty():
-            data = queue.get()
-
-            copy_Queue.put(data)
-        return copy_Queue
+    def stop_process(self):
+        for i in range(len(self.job_process)):
+            self.job_process[i].terminate()
+        self.process_task_done.terminate()
+    
     
 def demon_write_file(queue: mp.Queue, queue_done: mp.Queue):
     while True:
@@ -215,24 +216,50 @@ def demon_write_file(queue: mp.Queue, queue_done: mp.Queue):
 def demon_send_done_task(queue: mp.Queue):
     while True:
         if not queue.empty():
-            print(queue.get()) #отправка, что можно забирать
-        time.sleep(1)
+            senf_file_to_controller(queue.get())
+        time.sleep(.1)
+        
+async def senf_file_to_controller(data):
+    with io.open("files/admin_0/monologue.mp4", "rb") as file:
+        new_file = []
+        data['end'] = 'false'.encode()
+        while True:
+                f = file.read(1024 * 1024)
+                if not f:
+                        new_file.append('end'.encode())
+                        break
+        
+                new_file.append(f)  
+                     
+        async with ClientSession() as session:
+                for chunk in new_file:
+                        data['file_chunk'] = chunk
+                        if chunk == 'end'.encode():
+                            data['file_chunk']=b''
+                            data['end'] = 'true'.encode()
+                        response = await session.post("http://172.20.10.2:10000/upload_to_ctrller", data = data)
+                        print(response.status)
         
 async def is_valid(user_token):
     return user_token == "he45stogddf8g70sd7g0g7sd07gs05"
     
+
+async def start_server_async_run(host, port, number, queue: mp.Queue):
+    my_transport_server = transport_server(host, port, number, 50)
+    await my_transport_server.start_server()
+    while queue.empty(): 
+        await asyncio.sleep(.1)
+    my_transport_server.stop_process()
+
+def start_transport_server(host, port, number, queue: mp.Queue):
+    asyncio.run(start_server_async_run(host, port, number, queue))
+    
 async def main():           
-    my_input_servers = input_server('localhost', 8080)
-    
-    
-    my_transpot_servers = list()
+    my_input_servers = input_server(host, 8080)
     
     number_transport_servers = 3
-    number_process_demon = 5
-    
-    for i in range(number_transport_servers):
-        my_transpot_servers.append(transport_server('localhost', 8000 + i, number_process_demon, 50))
-    
+    number_demon_process = 3
+        
     credentials = {
         "user": "admin",
         "password": "root",
@@ -251,14 +278,27 @@ async def main():
     my_input_servers.app['db'] = pool
     tasks = [
         asyncio.create_task(my_input_servers.start_server()),
-        asyncio.create_task(my_transpot_servers.start_server())
     ]
+    transport_servers = []
+    terminate_queue = mp.Queue()
+    for i in range(number_transport_servers):
+        my_input_servers.transport_servers_URL.append(f"http://localhost:{ 8000 + i}")
+        transport_servers.append(mp.Process(target = start_transport_server, args = (host, 8000 + i, number_demon_process, terminate_queue)))
+        transport_servers[i].start()
+        
     await asyncio.gather(*tasks)
     
-    while True:
+    command = ''
+    while command != "/stop":
         command = await aioconsole.ainput()
         if command == "/stop":
-            break
+            terminate_queue.put(command)
+            
+            num_ended_process = 0
+            while num_ended_process != len(transport_servers):
+                for process in transport_servers:
+                    if not process.is_alive():
+                        num_ended_process += 1
     
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(senf_file_to_controller({'login': 'admin_0'.encode(), 'filename': 'monologue.mp4'.encode(), 'token': "he45stogddf8g70sd7g0g7sd07gs05".encode()}))
