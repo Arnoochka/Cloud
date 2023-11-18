@@ -1,24 +1,5 @@
-REPL_FOLDER = '/Users/maus/BPDATA'
 
-# controller settings
-CTRLLER_HOST = '0.0.0.0'
-CTRLLER_PORT = 9990
 
-# receiving 4096 bytes each time
-BUFFER_SIZE = 4096
-SEPARATOR = '<SEP>'
-
-# DEFAULT folder with users data
-DATA_FOLDER = '/Users/maus/DATA/'
-
-DATA_HOST = '0.0.0.0'
-
-COPY_HOST = '0.0.0.0'
-COPY_PORT = 10000
-COPY_SEPARATOR = '<CSEP>'
-
-DATA1_FOLDER = '/Users/maus/DATA-SERVERS/DISK1'
-DATA2_FOLDER = '/Users/maus/DATA-SERVERS/DISK2'
-DATA3_FOLDER = '/Users/maus/DATA-SERVERS/DISK3'
-DATA4_FOLDER = '/Users/maus/DATA-SERVERS/DISK4'
-
+DATA_SERVERS = [('172.20.10.2', 11000), ('172.20.10.2', 11005),
+                ('172.20.10.2', 11010), ('172.20.10.2', 11015),
+                ('172.20.10.2', 11020), ('172.20.10.2', 11025)]

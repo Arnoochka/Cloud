@@ -1,38 +1,35 @@
-import socket
-import os
-import tqdm
+import time
+import requests
 
-CTRLLER_HOST = '0.0.0.0'
-CTRLLER_PORT = 9990
+def start_client(filepath: str):
+        data = {'username': 'viktor'.encode(),
+                'token': '21249953&'.encode(),
+                'filename': 'Surrounder.png'.encode(),
+                'reason': 'upload'.encode(),
+                'end': 'true'.encode()}
+        
+        t = time.time()
+        with open(filepath, 'rb') as f:
+                chunk = f.read(1024 * 1024)
+                data['file_chunk'] = chunk
+                response = requests.post(
+                        'http://172.20.10.2:10000/get_disk', 
+                        files=data)
+                response = response.json()
+                requests.post(
+                        f'http://{response["data_host"]}:{response["data_port"]}/upload_to_data_server', 
+                        files=data)
+                
+        
+        data['reason'] = 'done'.encode()
+        data['data_host'] = f'{response["data_host"]}'.encode()
+        data['data_port'] = f'{response["data_port"]}'.encode()
+        response= requests.post(
+                'http://172.20.10.2:10000/get_disk',
+                files=data
+        )
+        print(response.json())
 
-BUFFER_SIZE = 4096
-SEPARATOR = '<SEP>'
 
-filename = '/Users/maus/g.cpp'
-filesize = os.path.getsize(filename)
 
-s = socket.socket()
-
-print(f'[+] Connecting to {CTRLLER_HOST}:{CTRLLER_PORT}')
-s.connect((CTRLLER_HOST, CTRLLER_PORT))
-print('[+] Connected')
-
-s.send(f'igor{SEPARATOR}{filename}{SEPARATOR}{filesize}'.encode())
-
-# start sending the file
-progress = tqdm.tqdm(range(filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-with open(filename, "rb") as f:
-    while True:
-        # read the bytes from the file
-        bytes_read = f.read(BUFFER_SIZE)
-        if not bytes_read:
-            # file transmitting is done
-            break
-        # we use sendall to assure transimission in 
-        # busy networks
-        s.sendall(bytes_read)
-        # update the progress bar
-        progress.update(len(bytes_read))
-# close the socket
-s.close()
-
+start_client('/Users/maus/Documents/GitHub/Cloud/server/image.jpg')
