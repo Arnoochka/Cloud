@@ -25,7 +25,6 @@ class MainDatabase:
     async def send_helper(self, data: dict) -> web.Response:
         async with ClientSession() as session:
             try:
-                self.index_next = (self.index_next + 1) % len(self.helper_url)
                 async with session.post(url=f"{self.helper_url[self.index_next]}/send_database", json=data, timeout=5) as response:
                     print(f"{self.helper_url[self.index_next]}/send_database")
                     return web.Response(status=response.status)
@@ -152,19 +151,25 @@ class DatabaseServer:
     async def start_db(self, database: str):
         pool = await asyncpg.create_pool(**database)
 
+        if pool._closed:
+            print("Connection failed")
+        else:
+            print("Connection to databes successfuly")
+        
         pool.acquire()
+        
         return pool
     
     async def send_database(self, data: dict):
         return await self.role.send_databases(data, self.app['db'])
             
 
-async def main(host="localhost", port=8888):
+async def main(host="172.20.10.2", port=8888):
     credentials = {
         "user": "admin",
         "password": "root",
         "database": "admin",
-        "host": "127.0.0.1",
+        "host": "172.20.10.2",
     }
     server = DatabaseServer(host, port, credentials)
     await server.start_server()
