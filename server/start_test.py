@@ -68,6 +68,7 @@ def client(number):
     #print(f"Process_{number}: начинается процесс отправки на {response.content.decode()}")
     #loop_send_file(login=data['login'], url=response.content.decode(), filename=data['filename'], path="C:\home screen\programming\Cloud\Cloud\server\hello.txt")
     get_filenames(login=data['login'])
+    loop_get_file(login=data['login'], filename=data['filename'])
     # print(time.time() - t)
 
 
