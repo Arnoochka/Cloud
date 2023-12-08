@@ -9,17 +9,52 @@
             AuthorizationScreen:
         
         TabbedPanelItem:
-            text: 'file_sending'
+            text: 'file sending'
             FileUploadScreen:
+
+        TabbedPanelItem:
+            text: 'view files'
+            FileViewScreen:
 
 <FileUploadScreen>:
     orientation: 'vertical'
 
-    #on_enter: root.show_auth_message()
+    #root.update_file_list()
 
     MDRaisedButton:
         text: 'Choose a file'
-        on_release: root.open_file_chooser()
+        on_release: 
+            root.show_auth_message()
+            root.open_file_chooser()
+
+<FileViewRow>:
+    orientation: 'horizontal'
+    Label:
+        text: root.file_name
+    Button:
+        text: root.delete_button
+        on_press: root.parent.parent.parent.delete_file(root.file_name)
+    Button:
+        text: root.download_button
+        on_press: root.parent.parent.parent.download_file(root.link)
+
+
+<FileViewScreen>:
+    orientation: 'vertical'
+
+    MDRaisedButton:
+        text: 'Update names'
+        on_release: root.update_file_list()
+
+    RecycleView:
+        id: file_view_rv
+        viewclass: 'FileViewRow'
+        RecycleGridLayout:
+            cols: 1
+            default_size: None, dp(48)
+            default_size_hint: 1, None
+            size_hint_y: None
+            height: self.minimum_height
 
 <AuthorizationScreen>: 
     orientation: 'vertical'
