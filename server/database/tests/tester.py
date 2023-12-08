@@ -1,51 +1,60 @@
 import requests
-
-DATABASE_TOKEN = "11e0eed8d3696c0a632f822df385ab3c"
-SERVER_TOKEN = "cf1e8c14e54505f60aa10ceb8d5d8ab3"
+import sys
+from config import *
 
 credentials = {
         "user": "admin",
         "password": "root",
         "database": "admin",
-        "host": "172.20.10.2"
+        "host": IP_VICTOR
     }
 
 if __name__ == "__main__":
-    response = requests.post("http://172.20.10.3:8001/new_main", json={"token": DATABASE_TOKEN, "URL": "http://172.20.10.2:8000", "credentials": credentials})
+    response = requests.post(f"http://{IP_TIMUR}:8001/new_main", json={"token": DATABASE_TOKEN, "URL": f"http://{IP_VICTOR}:8000", "credentials": credentials})
     print(response.status_code)
     
-    credentials = {
-        "user": "admin",
-        "password": "root",
-        "database": "admin",
-        "host": "172.20.10.2"
-    }
-    
-    response = requests.post("http://172.20.10.2:8002/new_main", json={"token": DATABASE_TOKEN, "URL": "http://172.20.10.2:8000", "credentials": credentials})
+    response = requests.post(f"http://{IP_VICTOR}:8002/new_main", json={"token": DATABASE_TOKEN, "URL": F"http://{IP_VICTOR}:8000", "credentials": credentials})
     print(response.status_code)
     
     credentials_1 = {
         "user": "admin",
         "password": "root",
         "database": "admin",
-        "host": "172.20.10.3"
+        "host": IP_TIMUR
     }
     
     credentials_2 = {
         "user": "admin",
         "password": "root",
         "database": "postgres",
-        "host": "172.20.10.2"
+        "host": IP_VICTOR
     }
     
     data = {"token": "cf1e8c14e54505f60aa10ceb8d5d8ab3", 
-            "databases":{"http://172.20.10.3:8001": credentials,
-                        "http://172.20.10.2:8002": credentials
+            "databases":{f"http://{IP_TIMUR}:8001": credentials,
+                        f"http://{IP_VICTOR}:8002": credentials
         }
     }
-    response = requests.post(url="http://172.20.10.2:8000/switch_role", json=data)
-    # print(response.status_code)
+    response = requests.post(url=f"http://{IP_VICTOR}:8000/switch_role", json=data)
+    print(response.status_code)
+    
+    data = {
+        'token': SERVER_TOKEN,
+        'URL':f"http://{IP_TIMUR}:8001",
+        "credentials": credentials_1
+    }
+    response = requests.post(url=F"http://{IP_VICTOR}:8888/add_helper", json=data)
+    print(response.status_code)
+    
+    data = {
+        'token': SERVER_TOKEN,
+        'URL':f"http://{IP_VICTOR}:8002",
+        "credentials": credentials_2
+    }
+    response = requests.post(url=f"http://{IP_VICTOR}:8888/add_helper", json=data)
+    print(response.status_code)
+    
     for i in range(100):
-        data = {"token": SERVER_TOKEN, "login": f"admin_{i}", "password": "root"}
-        response = requests.post(url="http://172.20.10.2:8000/authorization", json=data)
-        print(response.status_code)
+        data = {"login": f"admin_{i}", "password": "root"}
+        response = requests.post(url=f"http://{IP_VICTOR}:8888/authorization", json=data)
+        print(f"admin_{i}", response.status_code)

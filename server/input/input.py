@@ -6,35 +6,48 @@ import asyncpg
 import multiprocessing as mp
 import aioconsole
 import io
-DATABASE_TOKEN = "11e0eed8d3696c0a632f822df385ab3c"
-SERVER_TOKEN = "cf1e8c14e54505f60aa10ceb8d5d8ab3"
-USER_TOKEN = "ee11cbb19052e40b07aac0ca060c23ee"
-DB_TOKEN = "d77d5e503ad1439f585ac494268b351b"
-CONTROLLER_TOKEN = "594c103f2c6e04c3d8ab059f031e0c1a"
-    
+import sys
+from config import *
+ 
 class Input:
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, main_database_url: dict, main_database_credentials: dict):
         self.host = host
-        
         self.port = port
         self.app = web.Application(middlewares=[self.mid])
         
-        self.app['db'] = None
-        self.insert_sql = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
-        self.select_sql = '''SELECT * FROM registered WHERE login=$1'''
-        self.search_files_sql = '''SELECT filename FROM userFile WHERE login=$1'''
+        self.main_database = (main_database_url, main_database_credentials)
+        
+        self.databases = [self.main_database]
 
         self.app.router.add_post('/authorization', self.autorization)
+        self.app.router.add_post('/add_helper', self.add_helper)
     
     async def mid(self, app, handler):
         '''
         '''
         async def middleware(request: web.Request) -> web.Response:
             
-            data = request.json()
+            data = await request.json()
             
-            if request.path == "/aгthorization":
-                return await handler(request)
+            if request.path == "/authorization":
+                if len(self.databases) == 0:
+                    return web.Response(status=500)
+                
+                not_atribute = await self.checking_for_attributes(["login", "password"], data.keys())
+                
+                if not_atribute[0]:
+                    return web.Response(status=401, body=f"not received {not_atribute[1]}")
+                
+                return await handler(data)
+            
+            elif data['token'] == SERVER_TOKEN:
+                if request.path == "/add_helper":
+                    not_atribute = await self.checking_for_attributes(["URL", "credentials"], data.keys())
+                
+                if not_atribute[0]:
+                    return web.Response(status=401, body=f"not received {not_atribute[1]}")
+                        
+                return await handler(data)
             
             return web.Response(status=404)
         
@@ -46,7 +59,7 @@ class Input:
         self.site = web.TCPSite(self.runner, self.host, self.port)
         await self.site.start()
         
-        await aioconsole.aprint(f"сервер input_server, {self.port}, {self.host}")
+        await aioconsole.aprint(f"сервер Input, {self.port}, {self.host}")
 
     async def autorization(self, data: dict)->web.Response:
 
@@ -54,18 +67,99 @@ class Input:
         if not_atribute[0]:
             return web.Response(status=401, body=f"not received {not_atribute[1]}")
         
-        person = await self.app['db'].fetch(self.select_sql, data["login"])
-        if len(person) == 0:
-            await self.app['db'].fetch(self.insert_sql, data["login"], data["password"])
-            return web.Response(status=201, body=self.bearer_token)
-        elif person[0]["password"] == data["password"]:
-            return web.Response(status=200, body= self.bearer_token)
-        else: 
-            return web.Response(status=401, body= "invalid login or password")
+        async with ClientSession() as session:
+            try:
+                data['token'] = SERVER_TOKEN
+                async with session.post(url=f"{self.main_database[0]}/authorization", json=data, timeout=4) as response:
+                    if response.status == 200 or response.status == 201:
+                        return web.Response(status=response.status, body=USER_TOKEN)
+                    else:
+                        return web.Response(status=response.status)
+            except :
+                if len(self.databases) == 1:
+                    self.databases.pop(0)
+                    return web.Response(status=500)
+                
+                else:
+                    data_main = {
+                        'token': SERVER_TOKEN,
+                        'databases': dict()
+                    }
+                    
+                    for i in range(2, len(self.databases)):
+                        data_main['databases'][self.databases[i][0]] = self.databases[i][1]
+                        
+                    await self.new_main(data_main)
+                    
 
+    async def add_helper(self, data: dict):
+        self.databases.append((data["URL"], data["credentials"]))
+        async with ClientSession() as session:
+            try:
+                response = await session.post(url=f"{self.main_database[0]}/add_helper", json=data, timeout=5)
+                return web.Response(status=200)
+            except :
+                self.databases.pop(-1)
+                return web.Response(status=404)
+                
+    
+    async def new_main(self, data_main: dict):
+        self.databases.pop(0)
+        self.main_database = self.databases[0]
+        async with ClientSession() as session:
+            try:
+                async with session.post(url=f"{self.main_database[0]}/switch_role", json=data_main, timeout=5) as response:
+                    delete = list()
+                    for i in range(1, len(self.databases)):
+                        try:
+                            response = await session.post(url=f"{self.databases[i][0]}/new_main", json={"token": SERVER_TOKEN, "URL": self.main_database[0], "credentials": self.main_database[1]})
+                        except :
+                            delete.append(i)
+                            
+                    shift = 0
+                    for x in delete:
+                        self.databases.pop(x - shift)
+                        shift += 1
+                                
+                
+            except :
+                await self.new_main(data_main)
+                
+    async def send_file(self, data: dict)->web.Response:
+        pass
+    
+    async def get_files(self, data: dict)->web.Response:
+        pass
+        
     async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
         for atribute in atributes:
             if not atribute in data_atribute:
                 return (1, atribute)
         return (0, "not")
+    
+    def __repr__(self) -> str:
+        return f"URL=http://{self.host}:{self.port}, main database={self.main_database[0]}, number_databases = {len(self.databases)}"
+
+async def main(port=8888):
+    credentials = {
+        "user": "admin",
+        "password": "root",
+        "database": "admin",
+        "host": IP_VICTOR
+    }
+    
+    input_server = Input(IP_VICTOR, port, f"http://{IP_VICTOR}:8000", credentials)
+    await input_server.start_server()
+    
+    command = ''
+    while True:
+        command = await aioconsole.ainput()
+        if command == "/stop":
+            break
+        elif command == "/settings":
+            print(input_server)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    
     

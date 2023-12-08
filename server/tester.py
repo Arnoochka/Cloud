@@ -15,7 +15,7 @@ if __name__ == "__main__":
     print(response.status_code)
     response = requests.post("http://localhost:8002/new_main", json={"token": DATABASE_TOKEN, "URL": "http://localhost:8000", "credentials": credentials})
     print(response.status_code)
-    data = {"token": "cf1e8c14e54505f60aa10ceb8d5d8ab3", 
+    data = {"token": SERVER_TOKEN, 
             "databases":{"http://localhost:8001": credentials,
                         "http://localhost:8002": credentials
         }

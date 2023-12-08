@@ -5,11 +5,9 @@ import aioconsole
 import asyncpg
 import multiprocessing as mp
 import aioconsole
+import sys
 import json
-
-DATABASE_TOKEN = "11e0eed8d3696c0a632f822df385ab3c"
-SERVER_TOKEN = "cf1e8c14e54505f60aa10ceb8d5d8ab3"
-USER_TOKEN = "ee11cbb19052e40b07aac0ca060c23ee"
+from config import *
 
 SELECT_SQL = '''SELECT * FROM registered WHERE login=$1'''
 INSERT_SQL = '''INSERT INTO registered(login, password) VALUES($1, $2)'''
@@ -48,6 +46,8 @@ class MainDatabase:
                     await main_database.fetch(INSERT_SQL, data["login"], data["password"])
                     
         except asyncio.TimeoutError: 
+            self.helper_database.pop(self.index_next)
+            self.helper_url.pop(self.index_next)
             return web.Response(status=501)
             
         return web.Response(status=200)
@@ -164,14 +164,14 @@ class DatabaseServer:
         return await self.role.send_databases(data, self.app['db'])
             
 
-async def main(host="172.20.10.2", port=8888):
+async def main(port):
     credentials = {
         "user": "admin",
         "password": "root",
         "database": "postgres",
-        "host": "172.20.10.2",
+        "host": IP_VICTOR,
     }
-    server = DatabaseServer(host, port, credentials)
+    server = DatabaseServer(IP_VICTOR, port, credentials)
     await server.start_server()
     
     command = ''
