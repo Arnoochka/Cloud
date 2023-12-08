@@ -6,6 +6,7 @@ from config import *
 
 def loop_send_file(url: str='http://192.168.34.210:48901',login: str='victor', token: str=USER_TOKEN, filename: str='victor_world', path: str='/Users/maus/Desktop/victor_world'):
         response = requests.get(url+'/start', files={'token': token.encode(), 'login': login.encode()})
+        print("db code=", response.status_code)
 
         if 'sorry' not in response.json():
                 with open(path, 'rb') as file:
@@ -32,6 +33,17 @@ def loop_send_file(url: str='http://192.168.34.210:48901',login: str='victor', t
 
                                 i += 1
 
+def loop_get_file(url: str='http://192.168.34.210:48901',login: str='victor', token: str=USER_TOKEN, filename: str='victor_world'):
+    response = requests.get('http://192.168.34.210:48901/download', json={
+        'login': login,
+        'filename': filename,
+        'token': USER_TOKEN
+    })
+
+    file_stream = response.content
+    with open('hey', 'wb') as file_object:
+        file_object.write(file_stream)
+
 def client(number):
     data = {'login': f'admin_{str(number)}',
             'password': 'inside-your-dad'}
@@ -39,7 +51,7 @@ def client(number):
     t = time.time()
     response = requests.post(f"http://{IP_VICTOR}:8011/authorization", json=data)
     
-    if not (response.status_code >= 200 and response.status_code < 300):
+    if response.status_code == 401:
         print(f"Process_{number}: pizda")
         return
     data = {
@@ -50,15 +62,12 @@ def client(number):
     
     response = requests.post(f'http://{IP_VICTOR}:8011/send_file', json=data)
     
-    if not (response.status_code >= 200 and response.status_code < 300):
-        print(f"Process_{number}: blya, {response.status_code}")
-        return
-    
-    print(f"Process_{number}: начинается процесс отправки")
-    
+    print(f"Process_{number}: {response.status_code}")
+    if response.status_code == 401 or response.status_code == 400: return
+    print(f"Process_{number}: начинается процесс отправки на {response.content.decode()}")
     loop_send_file(login=data['login'], url=response.content.decode(), filename=data['filename'], path="C:\home screen\programming\Cloud\Cloud\server\hello.txt")
-        
-    print(time.time() - t)
+    loop_get_file(url=response.content.decode(), login=data['login'], filename=data['filename'])
+    # print(time.time() - t)
 
 
 if __name__ == "__main__":

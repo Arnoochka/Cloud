@@ -25,6 +25,8 @@ class Input:
         self.app.router.add_post('/add_helper', self.add_helper)
         self.app.router.add_post('/start_controller', self.start_new_controller)
         self.app.router.add_post('/send_file', self.send_file)
+        self.app.router.add_post('/get_file', self.get_file)
+        self.app.router.add_get('/get_files_names', self.get_files_names)
     
     async def mid(self, app, handler):
         '''
@@ -32,6 +34,7 @@ class Input:
         async def middleware(request: web.Request) -> web.Response:
             
             data = await request.json()
+            print(data)
             
             if request.path == "/authorization":
                 if len(self.databases) == 0:
@@ -55,6 +58,12 @@ class Input:
             elif data['token'] == USER_TOKEN:
                 if request.path == "/send_file":
                     not_atribute = await self.checking_for_attributes(['login', 'filename'], data.keys())
+                    
+                elif request.path == "/get_file":
+                    not_atribute = await self.checking_for_attributes(['login', 'filename'], data.keys())
+                    
+                elif request.path == "/get_files_names":
+                    not_atribute = await self.checking_for_attributes(['login'], data.keys())
                     
                 if not_atribute[0]:
                     return web.Response(status=401, body=f"not received {not_atribute[1]}")
@@ -160,23 +169,61 @@ class Input:
         
         data['token'] = SERVER_TOKEN
         async with ClientSession() as session:
-                try:
-                    index = random.randint(0, len(self.controllers) - 1)
-                    async with session.get(url=f"{self.controllers[index]}/get_disk_to_upload", json=data, timeout=5) as response:
-                        
-                        if response.status == 200:
-                            data = await response.json()
-                            return web.Response(status=200, body=data['URL'])
-                        else:
-                            return web.Response(status=response.status)
-                except:
-                    return web.Response(status=500) 
+            index = random.randint(0, len(self.controllers) - 1)
+            try:
+                print(self.controllers[index])
+                async with session.get(url=f"{self.controllers[index]}/get_disk_to_upload", json=data, timeout=5) as response:
+                    
+                    if response.status == 200:
+                        data = await response.json()
+                        return web.Response(status=200, body=data['URL'])
+                    else:
+                        return web.Response(status=response.status)
+            except:
+                self.controllers.pop(index)
+                return web.Response(status=500) 
                             
     async def get_file(self, data: dict)->web.Response:
-        pass
+                
+        if len(self.controllers) == 0:
+            return web.Response(status=500)
+        
+        data['token'] = SERVER_TOKEN
+        async with ClientSession() as session:
+            index = random.randint(0, len(self.controllers) - 1)
+            try:
+                print(self.controllers[index])
+                async with session.get(url=f"{self.controllers[index]}/СМЕНИТЬ ВЕТКУ", json=data, timeout=5) as response:
+                    
+                    if response.status == 200:
+                        data = await response.json()
+                        return web.Response(status=200, body=data['URL'])
+                    else:
+                        return web.Response(status=response.status)
+            except:
+                self.controllers.pop(index)
+                return web.Response(status=500) 
     
     async def get_files_names(self, data: dict)->web.Response:
-        pass
+        
+        if len(self.controllers) == 0:
+            return web.Response(status=500)
+        
+        data['token'] = SERVER_TOKEN
+        async with ClientSession() as session:
+            index = random.randint(0, len(self.controllers) - 1)
+            try:
+                print(self.controllers[index])
+                async with session.get(url=f"{self.controllers[index]}/СМЕНИТЬ ВЕТКУ", json=data, timeout=5) as response:
+                    
+                    if response.status == 200:
+                        data = await response.json()
+                        return web.json_response(data)
+                    else:
+                        return web.Response(status=response.status)
+            except:
+                self.controllers.pop(index)
+                return web.Response(status=500) 
         
     async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
         for atribute in atributes:

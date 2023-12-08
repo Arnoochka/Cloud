@@ -53,8 +53,9 @@ class MainDatabase:
         return web.Response(status=200)
     
     async def add_helper(self, helper_url, helper_database) -> web.Response:
-        self.helper_url.append(helper_url)
-        self.helper_database.append(helper_database)
+        if not helper_url in self.helper_url:
+            self.helper_url.append(helper_url)
+            self.helper_database.append(helper_database)
         return web.Response(status=201)
     
     def __repr__(self) -> str:
