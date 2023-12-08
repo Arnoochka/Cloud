@@ -29,10 +29,9 @@ class MainScreen(BoxLayout):
 login = ""
 password = ""
 token = ""
-ip_list = ["192.168.154.5"]
+ip_list = ["192.168.34.5:8011"]
 ip = ""
-files = {"link": "1.txt",
-         "link1": "2.txt"}
+files = ["1.txt", "2.txt"]
 
 
 class AuthorizationScreen(BoxLayout):
@@ -48,7 +47,7 @@ class AuthorizationScreen(BoxLayout):
         data = {'login': login, 'password': password}
         for ipp in ip_list:
             try:
-                response = requests.post(f'http://{ipp}:8080/login', json=data)
+                response = requests.post(f'http://{ipp}/authorization', json=data, timeout=5)
             except:
                 pass
             else:
@@ -56,7 +55,8 @@ class AuthorizationScreen(BoxLayout):
                     token = response.content.decode()  
                     ip = ipp            
                     break
-
+        
+        print(token)
 
 class FileViewScreen(BoxLayout):
     def on_enter(self):
@@ -64,27 +64,34 @@ class FileViewScreen(BoxLayout):
         self.update_file_list()
 
     def update_file_list(self):
+        global ip_list
         global files
+        global login
+        global token
         
+        #response = requests.get(f"http://{ip_list[0]}/get_files_names", json={"login": login, "token": token})
+        #print(response.status_code)
+        #парсинг json
+
         recycle_view = self.ids.file_view_rv
 
-        # Очищаем текущие виджеты
         recycle_view.data = []
 
-
-        for link in files:
-            file_name = files[link]
-            recycle_view.data.append({'file_name': file_name, 'delete_button': 'Delete', 'download_button': 'Download', 'link': link})
+        for name in files:
+            file_name = name
+            recycle_view.data.append({'file_name': file_name, 'delete_button': 'Delete', 'download_button': 'Download'})
 
 
     def delete_file(self, instance):
         print(instance)
+        #Удаляем файл
 
 
     def download_file(self, instance):
         global files
+        global login
+        global token
 
-        path = files[instance]
         """
         async with aiohttp.ClientSession() as session:
             async with session.post(link) as response:
@@ -95,14 +102,19 @@ class FileViewScreen(BoxLayout):
                             break
                         file.write(chunk)
         """
-        response = requests.post(instance)
-        with open(path, 'wb') as file:
-            while True:
-                chunk =  response.content.read(1024)
-                if not chunk:
-                    break
-                file.write(chunk)
+        filename = instance
+        response = requests.post(f'http://{ip_list[0]}/get_file', json={'login': login, 'filename': filename, 'token': token})
+        url = response.content.decode()
 
+        response = requests.get(url + '/download', json={
+        'login': login,
+        'filename': filename,
+        'token': token
+        })
+
+        file_stream = response.content
+        with open(filename, 'wb') as file_object:
+            file_object.write(file_stream)
 
 class FileViewRow(BoxLayout):
     file_name = StringProperty()
@@ -129,31 +141,47 @@ class FileUploadScreen(BoxLayout):
     def upload_file(self, instance, value, h):
         global login
         global token
+        global ip_list
 
         file_path:str = value[0]
         file_name = file_path
 
-        with io.open(file_path, "rb") as file:
-            new_file = ["start".encode()]
-            while True:
-                f = file.read(1024)
-                if not f:
-                    new_file.append("end".encode())
-                    break
-                new_file.append(f)
+        data = {
+        'token': token,
+        'login': login,
+        'filename': file_name
+        }
 
-            data = {
-                'login': login.encode(),
-                'file_chunk': [],
-                'filename': file_path.encode(),
-                'token': token.encode()
-            }
+        response = requests.post(f'http://{ip_list[0]}/send_file', json=data)
+        url = response.content.decode()
+        print(response.status_code)
+        response = requests.get(url+'/start', files={'token': token.encode(), 'login': login.encode()})
+        print("db code=", response.status_code)
 
-            response = requests.post(f"http://{ip}:8080/send_file", data=data)            
-            print(response.content.decode())
-            url = response.content.decode()
+        if 'sorry' not in response.json():
+                with open(file_path, 'rb') as file:
+                        i = 1
+                        data = {
+                                'login': login.encode(),
+                                'token': token.encode(),
+                                'chunk': ''.encode(),
+                                'name': file_name.encode(),
+                                'end': 'false'.encode()
+                        }
+                        while True:
+                                f = file.read(1024*1024*3)
+                                if not f:
+                                        data['chunk'] = ''.encode()
+                                        data['end'] = 'true'.encode()
+                                        response = requests.post(url+'/upload', files=data)
+                                        break
 
-            asyncio.run(self.upload_chunks(new_file, data, url, file_name))
+                                data['chunk'] = f
+                                response = requests.post(url+'/upload', files=data).json()
+
+                                if 'sorry' in response: break
+
+                                i += 1
 
     async def upload_chunks(self, new_file, data, url, file_name):
         global files
@@ -169,10 +197,21 @@ class FileUploadScreen(BoxLayout):
                 print(response.status)
         
         """
+        token = data['token']
+        login = data['login']
+
+
+        response = requests.get(url+'/start', files={'token': token, 'login': login})
+        print("db code=", response.status_code)
+
+        if 'sorry' not in response.json():
+            pass
+
         for chunk in new_file:
             response = requests.post(f"http://{url}/send_file", data=data, files={"file_chunk": chunk})
             files[response.content.decode()] = file_name
             print(response.content)
+            print(files)
 
 
 
