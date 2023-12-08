@@ -6,6 +6,7 @@ import asyncpg
 import multiprocessing as mp
 import aioconsole
 import io
+import random
 import sys
 from config import *
  
@@ -16,11 +17,14 @@ class Input:
         self.app = web.Application(middlewares=[self.mid])
         
         self.main_database = (main_database_url, main_database_credentials)
-        
         self.databases = [self.main_database]
+        
+        self.controllers =  ['http://192.168.34.210:10000', 'http://192.168.34.210:10005', 'http://192.168.34.210:10010']
 
         self.app.router.add_post('/authorization', self.autorization)
         self.app.router.add_post('/add_helper', self.add_helper)
+        self.app.router.add_post('/start_controller', self.start_new_controller)
+        self.app.router.add_post('/send_file', self.send_file)
     
     async def mid(self, app, handler):
         '''
@@ -48,6 +52,24 @@ class Input:
                     return web.Response(status=401, body=f"not received {not_atribute[1]}")
                         
                 return await handler(data)
+            elif data['token'] == USER_TOKEN:
+                if request.path == "/send_file":
+                    not_atribute = await self.checking_for_attributes(['login', 'filename'], data.keys())
+                    
+                if not_atribute[0]:
+                    return web.Response(status=401, body=f"not received {not_atribute[1]}")
+                
+                return await handler(data)
+            
+            elif data['token'] == CONTROLLER_TOKEN:
+                if request.path == "/start_controller":
+                    not_atribute = await self.checking_for_attributes(["URL"], data.keys())
+                    
+                if not_atribute[0]:
+                    return web.Response(status=401, body=f"not received {not_atribute[1]}")
+                
+                return await handler(data)
+                    
             
             return web.Response(status=404)
         
@@ -124,11 +146,36 @@ class Input:
                 
             except :
                 await self.new_main(data_main)
-                
+      
+    async def start_new_controller(self, data: dict)->web.Response:
+        if data['URL'] in self.controllers:
+            return web.Response(status=200)
+        self.controllers.append(data['URL'])
+        return web.Response(status=201)
+              
     async def send_file(self, data: dict)->web.Response:
+        
+        if len(self.controllers) == 0:
+            return web.Response(status=500)
+        
+        data['token'] = SERVER_TOKEN
+        async with ClientSession() as session:
+                try:
+                    index = random.randint(0, len(self.controllers) - 1)
+                    async with session.get(url=f"{self.controllers[index]}/get_disk_to_upload", json=data, timeout=5) as response:
+                        
+                        if response.status == 200:
+                            data = await response.json()
+                            return web.Response(status=200, body=data['URL'])
+                        else:
+                            return web.Response(status=response.status)
+                except:
+                    return web.Response(status=500) 
+                            
+    async def get_file(self, data: dict)->web.Response:
         pass
     
-    async def get_files(self, data: dict)->web.Response:
+    async def get_files_names(self, data: dict)->web.Response:
         pass
         
     async def checking_for_attributes(self, atributes: list, data_atribute)->tuple:
@@ -138,7 +185,7 @@ class Input:
         return (0, "not")
     
     def __repr__(self) -> str:
-        return f"URL=http://{self.host}:{self.port}, main database={self.main_database[0]}, number_databases = {len(self.databases)}"
+        return f"URL=http://{self.host}:{self.port}, main database={self.main_database[0]} \n databases = {self.databases} \n contorllers = {self.controllers} \n"
 
 async def main(port=8888):
     credentials = {
@@ -160,6 +207,7 @@ async def main(port=8888):
             print(input_server)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(input())
+    asyncio.run(main(port=port))
     
     

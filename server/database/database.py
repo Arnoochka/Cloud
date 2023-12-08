@@ -27,7 +27,7 @@ class MainDatabase:
                     print(f"{self.helper_url[self.index_next]}/send_database")
                     return web.Response(status=response.status)
                     
-            except asyncio.TimeoutError:
+            except :
                 self.helper_database.pop(self.index_next)
                 self.helper_url.pop(self.index_next)
                 return web.Response(status=501)
@@ -45,7 +45,7 @@ class MainDatabase:
                 else:
                     await main_database.fetch(INSERT_SQL, data["login"], data["password"])
                     
-        except asyncio.TimeoutError: 
+        except : 
             self.helper_database.pop(self.index_next)
             self.helper_url.pop(self.index_next)
             return web.Response(status=501)
