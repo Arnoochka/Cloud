@@ -9,29 +9,30 @@ def loop_send_file(url: str='http://192.168.34.210:48901',login: str='victor', t
         print("db code=", response.status_code)
 
         if 'sorry' not in response.json():
-                with open(path, 'rb') as file:
-                        i = 1
-                        data = {
-                                'login': login.encode(),
-                                'token': token.encode(),
-                                'chunk': ''.encode(),
-                                'name': filename.encode(),
-                                'end': 'false'.encode()
-                        }
-                        while True:
-                                f = file.read(1024*1024*3)
-                                if not f:
-                                        data['chunk'] = ''.encode()
-                                        data['end'] = 'true'.encode()
-                                        response = requests.post(url+'/upload', files=data)
-                                        break
+            with open(path, 'rb') as file:
+                i = 1
+                data = {
+                        'login': login.encode(),
+                        'token': token.encode(),
+                        'chunk': ''.encode(),
+                        'name': filename.encode(),
+                        'end': 'false'.encode()
+                }
+                while True:
+                        f = file.read(1024*1024*3)
+                        if not f:
+                                data['chunk'] = ''.encode()
+                                data['end'] = 'true'.encode()
+                                response = requests.post(url+'/upload', files=data)
+                                break
+                        data['chunk'] = f
+                        response = requests.post(url+'/upload', files=data).json()
+                        if 'sorry' in response: break
+                        i += 1
 
-                                data['chunk'] = f
-                                response = requests.post(url+'/upload', files=data).json()
-
-                                if 'sorry' in response: break
-
-                                i += 1
+def get_filenames(login="", token = USER_TOKEN):
+    response = requests.get(f"http://{IP_VICTOR}:8011/get_files_names", json={"login": login, "token": token})
+    print(response.content.decode())
 
 def loop_get_file(url: str='http://192.168.34.210:48901',login: str='victor', token: str=USER_TOKEN, filename: str='victor_world'):
     response = requests.get('http://192.168.34.210:48901/download', json={
@@ -63,10 +64,10 @@ def client(number):
     response = requests.post(f'http://{IP_VICTOR}:8011/send_file', json=data)
     
     print(f"Process_{number}: {response.status_code}")
-    if response.status_code == 401 or response.status_code == 400: return
-    print(f"Process_{number}: начинается процесс отправки на {response.content.decode()}")
-    loop_send_file(login=data['login'], url=response.content.decode(), filename=data['filename'], path="C:\home screen\programming\Cloud\Cloud\server\hello.txt")
-    loop_get_file(url=response.content.decode(), login=data['login'], filename=data['filename'])
+    #if response.status_code == 401 or response.status_code == 400: return
+    #print(f"Process_{number}: начинается процесс отправки на {response.content.decode()}")
+    #loop_send_file(login=data['login'], url=response.content.decode(), filename=data['filename'], path="C:\home screen\programming\Cloud\Cloud\server\hello.txt")
+    get_filenames(login=data['login'])
     # print(time.time() - t)
 
 

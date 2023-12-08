@@ -193,7 +193,7 @@ class Input:
             index = random.randint(0, len(self.controllers) - 1)
             try:
                 print(self.controllers[index])
-                async with session.get(url=f"{self.controllers[index]}/СМЕНИТЬ ВЕТКУ", json=data, timeout=5) as response:
+                async with session.get(url=f"{self.controllers[index]}/get_disk_to_download", json=data, timeout=5) as response:
                     
                     if response.status == 200:
                         data = await response.json()
@@ -214,7 +214,7 @@ class Input:
             index = random.randint(0, len(self.controllers) - 1)
             try:
                 print(self.controllers[index])
-                async with session.get(url=f"{self.controllers[index]}/СМЕНИТЬ ВЕТКУ", json=data, timeout=5) as response:
+                async with session.get(url=f"{self.controllers[index]}/get_filenames_to_update", json=data, timeout=5) as response:
                     
                     if response.status == 200:
                         data = await response.json()
