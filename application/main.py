@@ -11,6 +11,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.properties import StringProperty
 from kivy.lang import Builder
 import requests
+import json
 import aiohttp
 import io
 import asyncio
@@ -69,9 +70,10 @@ class FileViewScreen(BoxLayout):
         global login
         global token
         
-        #response = requests.get(f"http://{ip_list[0]}/get_files_names", json={"login": login, "token": token})
-        #print(response.status_code)
-        #парсинг json
+        response = requests.get(f"http://{ip_list[0]}/get_files_names", json={"login": login, "token": token})
+        print(response.status_code)
+        json_data = json.loads(response.json)
+        files = json_data["FILENAMES"]
 
         recycle_view = self.ids.file_view_rv
 
