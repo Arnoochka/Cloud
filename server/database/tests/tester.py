@@ -10,8 +10,8 @@ credentials = {
     }
 
 if __name__ == "__main__":
-    # response = requests.post(f"http://{IP_TIMUR}:8001/new_main", json={"token": DATABASE_TOKEN, "URL": f"http://{IP_VICTOR}:8000", "credentials": credentials})
-    # print(response.status_code)
+    response = requests.post(f"http://{IP_TIMUR}:8001/new_main", json={"token": DATABASE_TOKEN, "URL": f"http://{IP_VICTOR}:8000", "credentials": credentials})
+    print(response.status_code)
     
     response = requests.post(f"http://{IP_VICTOR}:8002/new_main", json={"token": DATABASE_TOKEN, "URL": F"http://{IP_VICTOR}:8000", "credentials": credentials})
     print(response.status_code)
