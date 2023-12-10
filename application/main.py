@@ -30,9 +30,10 @@ class MainScreen(BoxLayout):
 login = ""
 password = ""
 token = ""
-ip_list = ["192.168.34.5:8011"]
+ip_list = ["192.168.34.5:8011", "192.168.34.5:8012", "192.168.34.5:8013", "192.168.34.5:8014"]
 ip = ""
-files = ["1.txt", "2.txt"]
+files = []
+del_fil = []
 
 
 class AuthorizationScreen(BoxLayout):
@@ -69,11 +70,26 @@ class FileViewScreen(BoxLayout):
         global files
         global login
         global token
+        global del_fil
         
-        response = requests.get(f"http://{ip_list[0]}/get_files_names", json={"login": login, "token": token})
+
+        for ipp in ip_list:
+            try:
+                response = requests.get(f"http://{ipp}/get_files_names", json={"login": login, "token": token})
+            except:
+                pass
+            else:
+                if response.status_code == 200:        
+                    break
+
+        #response = requests.get(f"http://{ip_list[0]}/get_files_names", json={"login": login, "token": token})
         print(response.status_code)
-        json_data = json.loads(response.json)
+        #rs = '{"FILENAMES": ["1.txt", "2.txt", "3.png"]}'
+        json_data = json.loads(response.content.decode())
         files = json_data["FILENAMES"]
+
+        files = [i for i in files if i not in del_fil]
+
 
         recycle_view = self.ids.file_view_rv
 
@@ -86,10 +102,11 @@ class FileViewScreen(BoxLayout):
 
     def delete_file(self, instance):
         print(instance)
-        #Удаляем файл
+        del_fil.append(instance)
 
 
     def download_file(self, instance):
+        global ip_list
         global files
         global login
         global token
@@ -105,8 +122,21 @@ class FileViewScreen(BoxLayout):
                         file.write(chunk)
         """
         filename = instance
-        response = requests.post(f'http://{ip_list[0]}/get_file', json={'login': login, 'filename': filename, 'token': token})
+
+        for ipp in ip_list:
+            try:
+                response = requests.post(f'http://{ipp}/get_file', json={'login': login, 'filename': filename, 'token': token})
+            except:
+                pass
+            else:
+                if response.status_code == 200:        
+                      break
+            
+        #response = requests.post(f'http://{ip_list[0]}/get_file', json={'login': login, 'filename': filename, 'token': token})
         url = response.content.decode()
+
+        print(response.status_code)
+        print(url, "===")
 
         response = requests.get(url + '/download', json={
         'login': login,
@@ -144,9 +174,13 @@ class FileUploadScreen(BoxLayout):
         global login
         global token
         global ip_list
+        global del_fil
 
         file_path:str = value[0]
-        file_name = file_path
+        file_name = file_path.split("\\")[-1]
+        
+        if file_name in del_fil:
+            del_fil.remove(file_name)
 
         data = {
         'token': token,
@@ -154,36 +188,49 @@ class FileUploadScreen(BoxLayout):
         'filename': file_name
         }
 
-        response = requests.post(f'http://{ip_list[0]}/send_file', json=data)
-        url = response.content.decode()
-        print(response.status_code)
-        response = requests.get(url+'/start', files={'token': token.encode(), 'login': login.encode()})
-        print("db code=", response.status_code)
+        print(data)
 
-        if 'sorry' not in response.json():
-                with open(file_path, 'rb') as file:
-                        i = 1
-                        data = {
-                                'login': login.encode(),
-                                'token': token.encode(),
-                                'chunk': ''.encode(),
-                                'name': file_name.encode(),
-                                'end': 'false'.encode()
-                        }
-                        while True:
-                                f = file.read(1024*1024*3)
-                                if not f:
-                                        data['chunk'] = ''.encode()
-                                        data['end'] = 'true'.encode()
-                                        response = requests.post(url+'/upload', files=data)
-                                        break
+        for ipp in ip_list:
+            try:
+                response = requests.post(f'http://{ipp}/send_file', json=data)
+            except:
+                pass
+            else:
+                if response.status_code == 200:        
+                    break
 
-                                data['chunk'] = f
-                                response = requests.post(url+'/upload', files=data).json()
 
-                                if 'sorry' in response: break
+        #response = requests.post(f'http://{ip_list[0]}/send_file', json=data)
+        if response.status_code != 401:
+            url = response.content.decode()
+            print(response.status_code)
+            response = requests.get(url+'/start', files={'token': token.encode(), 'login': login.encode()})
+            print("db code=", response.status_code)
 
-                                i += 1
+            if 'sorry' not in response.json():
+                    with open(file_path, 'rb') as file:
+                            i = 1
+                            data = {
+                                    'login': login.encode(),
+                                    'token': token.encode(),
+                                    'chunk': ''.encode(),
+                                    'name': file_name.encode(),
+                                    'end': 'false'.encode()
+                            }
+                            while True:
+                                    f = file.read(1024*1024*3)
+                                    if not f:
+                                            data['chunk'] = ''.encode()
+                                            data['end'] = 'true'.encode()
+                                            response = requests.post(url+'/upload', files=data)
+                                            break
+
+                                    data['chunk'] = f
+                                    response = requests.post(url+'/upload', files=data).json()
+
+                                    if 'sorry' in response: break
+
+                                    i += 1
 
     async def upload_chunks(self, new_file, data, url, file_name):
         global files
